@@ -36,11 +36,12 @@ create table books(
 );
 
 create table reviews(
+reviewid	integer unique auto_increment not null,
 	username	varchar(20) not null,
 	dateupdate	date ,
 	text		varchar(500),
 	bookid		int not null,
 	foreign key (username) references users(username),
-	foreign key (bookid) references books(bookid),
+	foreign key (bookid) references books(bookid) on delete cascade,
 	primary key (bookid,username)
 );
