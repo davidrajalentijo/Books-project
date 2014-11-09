@@ -31,6 +31,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.SecurityContext;
 
 import edu.upc.eetac.dsa.draja.books.server.DataSourceSPA;
+import edu.upc.eetac.dsa.draja.books.server.model.Authors;
 import edu.upc.eetac.dsa.draja.books.server.model.Books;
 import edu.upc.eetac.dsa.draja.books.server.model.BooksCollection;
 import edu.upc.eetac.dsa.draja.books.server.model.Reviews;
@@ -58,8 +59,15 @@ public class BooksResource {
 	private String UPDATE_REVIEW_QUERY ="update reviews set  text=ifnull(?, text) where bookid=? and reviewid=?;";
 	private String GET_REVIEW_BY_REVIEWID_QUERY = "select * from reviews where bookid=? and reviewid=?;";
 	private String DELETE_REVIEW_QUERY="delete from reviews where reviewid=? and bookid=?;";
-	
-    //Metodo que devuelve la ficha de un libro en concreto, además es cacheable
+	private String INSERT_BOOK ="insert into books (title,author,language,edition,editorial,printdate,editiondate) values(?,?,?,?,?,?,?);";
+	private String UPDATE_BOOKS_QUERY = "update books set title=ifnull(?, title), author=ifnull(?, author), language=ifnull(?, language), edition=ifnull(?, edition), editiondate=ifnull(?, editiondate), printdate=ifnull(?, printdate), editorial=ifnull(?, editorial) where bookid=?;";
+    private String DELETE_BOOKS_QUERY ="delete from books where bookid=?;";
+    private String GET_BOOKS_COLLECTION_QUERY = "select * from books";
+    private String INSERT_AUTHOR ="insert into authors (name) values (?);";
+    private String DELETE_AUTHOR_QUERY = "delete from authors where authorid=?;";
+    private String UPDATE_AUTHOR_QUERY = "update authors set name=ifnull(?, name) where authorid=?;";
+    
+	//Metodo que devuelve la ficha de un libro en concreto, además es cacheable
 	@GET
 	@Path("/{bookid}")
 	@Produces(MediaType.BOOKS_API_BOOKS)
@@ -520,8 +528,440 @@ return review;
 	}
 
 	
-	//Metodo para Crear una Ficha de Autor
+	//Metodo para Crear una Ficha de un libro
+	//Metodo que nos permite crear una nueva reseña de un libro con rol registrado
+		@POST 
+		
+		@Consumes(MediaType.BOOKS_API_BOOKS) //no especifica el tipo que se come, jersey coje el json y crea un sting
+		@Produces(MediaType.BOOKS_API_BOOKS)
+		public Books createBook(Books book) {
+			//validateReseña(review);
+			
+			if (!security.isUserInRole("admin"))
+				throw new ForbiddenException("You are not allowed to create a book");
+			
+			
+			
+			Connection conn = null;
+			try {
+				conn = ds.getConnection();
+			} catch (SQLException e) {
+				throw new ServerErrorException("Could not connect to the database",
+						Response.Status.SERVICE_UNAVAILABLE);
+			}
+			System.out.println("Conectados a la base de datos");
+			PreparedStatement stmt = null;
+			
+			try {
+				
+				//Para que un usuario solo haga una reseña de un libro
+				
+				
+				stmt = conn.prepareStatement( INSERT_BOOK); 
+				
+				
+				stmt.setString(1, book.getTitle());
+				stmt.setString(2, book.getAuthor());
+				stmt.setString(3, book.getLanguage());
+				stmt.setString(4, book.getEdition());
+				stmt.setString(5, book.getEditorial());
+				stmt.setDate(6, (Date) book.getPrintdate());
+				stmt.setDate(7, (Date) book.getEditiondate());
+				System.out.println(stmt);
+				stmt.executeUpdate();
+				System.out.println("BOOK CREADO");
+				
+				
+				
+				//stmt.executeUpdate();// Ejecuto la actualización
+				ResultSet rs = stmt.getGeneratedKeys();// query para saber si ha ido
+				
+				
+				if (rs.next()) {
+					int bookid = rs.getInt(1);
+				} else {
+					throw new BadRequestException("Can't view the Review");
+				}
+			} catch (SQLException e) {
+				throw new ServerErrorException(e.getMessage(),
+						Response.Status.INTERNAL_SERVER_ERROR);
+			} finally {
+				try {
+					if (stmt != null)
+						stmt.close();
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+		 
+			return book;
+		}
 	
+		
+	//Metodo par Actualizar la ficha de un libro
+		@PUT
+		@Path("/{bookid}")
+		@Consumes(MediaType.BOOKS_API_BOOKS)
+		@Produces(MediaType.BOOKS_API_BOOKS)
+		public Books updateBook(@PathParam("bookid") int bookid, Books book) {
+
+			if (!security.isUserInRole("admin"))
+				throw new ForbiddenException("You are not allowed to delete a book");
+			System.out.println("Eres admin");
+
+			//setAdministrator(security.isUserInRole("admin"));
+
+			//ValidateBookforUpdate(book);
+			System.out.println("Book validado");
+			Connection conn = null;
+			try {
+				conn = ds.getConnection();
+			} catch (SQLException e) {
+				throw new ServerErrorException("Could not connect to the database",
+						Response.Status.SERVICE_UNAVAILABLE);
+			}
+			System.out.println("BD establecida");
+			PreparedStatement stmt = null;
+
+			try {
+				
+				
+				stmt = conn.prepareStatement(UPDATE_BOOKS_QUERY);
+				
+				stmt.setString(1, book.getTitle());
+				stmt.setString(2, book.getAuthor());
+				stmt.setString(3, book.getLanguage());
+				stmt.setString(4, book.getEdition());
+				stmt.setDate(5, (Date) book.getEditiondate());
+				stmt.setDate(6, (Date) book.getPrintdate());
+				stmt.setString(7, book.getEditorial());
+				stmt.setInt(8, bookid);
+				
+				int rows = stmt.executeUpdate();
+				
+				String sbookid = Integer.toString(bookid);
+				System.out.println("Miramos si hay contestación row=" + sbookid);
+				if (rows == 1) {
+					
+					book = getBookFromDatabase(sbookid);
+					
+				} else {
+					throw new NotFoundException("There's no book with bookid="
+							+ bookid);// Updating inexistent sting
+				}
+
+			} catch (SQLException e) {
+				throw new ServerErrorException(e.getMessage(),
+						Response.Status.INTERNAL_SERVER_ERROR);
+			} finally {
+				try {
+					if (stmt != null)
+						stmt.close();
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+
+			return book;
+		}
+
+		//Metodo para eliminar una ficha de un libro
+		@DELETE
+		@Path("/{bookid}")
+		public void deleteBook(@PathParam("bookid") String bookid) {
+
+			if (!security.isUserInRole("admin"))
+				throw new ForbiddenException("You are not allowed to delete a book");
+
+			Connection conn = null;
+			try {
+				conn = ds.getConnection();
+			} catch (SQLException e) {
+				throw new ServerErrorException("Could not connect to the database",
+						Response.Status.SERVICE_UNAVAILABLE);
+			}
+
+			PreparedStatement stmt = null;
+
+			try {
+				
+				stmt = conn.prepareStatement(DELETE_BOOKS_QUERY);
+				stmt.setInt(1, Integer.valueOf(bookid));
+
+				int rows = stmt.executeUpdate();
+
+				if (rows == 0)
+					throw new NotFoundException("There's no sting with book="
+							+ bookid);
+
+			} catch (SQLException e) {
+				throw new ServerErrorException(e.getMessage(),
+						Response.Status.INTERNAL_SERVER_ERROR);
+			} finally {
+				try {
+					if (stmt != null)
+						stmt.close();
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+
+		}
+
+		//METODO QUE DEVUELVE TODA LA COLECCIÓN DE LIBROS
+		@GET
+		@Produces(MediaType.BOOKS_API_BOOKS_COLLECTION)
+		public BooksCollection getBooks() {
+
+			
+			
+			
+			BooksCollection books = new BooksCollection();
+
+			Connection conn = null;
+			try {
+				conn = ds.getConnection();// Conectamos con la base de datos
+			} catch (SQLException e) {
+				throw new ServerErrorException("Could not connect to the database",
+						Response.Status.SERVICE_UNAVAILABLE);
+			}
+
+			PreparedStatement stmt = null;
+			
+
+			try {
+				
+				stmt = conn.prepareStatement(GET_BOOKS_COLLECTION_QUERY);
+				
+				ResultSet rs = stmt.executeQuery();
+				while (rs.next()) {
+					
+					Books book = new Books();
+
+					book.setId(rs.getInt("bookid"));
+					book.setTitle(rs.getString("title"));
+					book.setAuthor(rs.getString("author"));
+					book.setLanguage(rs.getString("language"));
+					book.setEdition(rs.getString("edition"));
+					book.setEditiondate(rs.getDate("editiondate"));
+					book.setPrintdate(rs.getDate("printdate"));
+					book.setEditorial(rs.getString("editorial"));
+
+					// Nos encargamos de las reviews de cada libro
+					PreparedStatement stmtr = null;
+					stmtr = conn.prepareStatement(GET_REVIEW_BY_ID_BOOK_QUERY);
+					stmtr.setInt(1, book.getId());
+
+					ResultSet rsr = stmtr.executeQuery();
+
+					while (rsr.next()) {
+						System.out.println("Review cogida");
+						Reviews review = new Reviews();
+						review.setReviewid(rsr.getInt("reviewid"));
+						review.setDateupdate(rsr.getDate("dateupdate"));
+						review.setText(rsr.getString("text"));
+						review.setUsername(rsr.getString("username"));
+						review.setBookid(rsr.getInt("bookid"));
+
+						book.addReviews(review);
+
+					}
+
+					books.addBook(book);
+				}
+
+			} catch (SQLException e) {
+				throw new ServerErrorException(e.getMessage(),
+						Response.Status.INTERNAL_SERVER_ERROR);
+			} finally {
+				try {
+					if (stmt != null)
+						stmt.close();
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+
+			return books;
+		}
+
+		
+		//Metodo para crear una ficha de autor
+@POST 
+		@Path("/author")
+		@Consumes(MediaType.BOOKS_API_BOOKS) //no especifica el tipo que se come, jersey coje el json y crea un sting
+		@Produces(MediaType.BOOKS_API_BOOKS)
+		public Authors createAuthor(Authors author) {
+			//validateReseña(review);
+			
+			if (!security.isUserInRole("admin"))
+				throw new ForbiddenException("You are not allowed to create a book");
+			
+			
+			
+			Connection conn = null;
+			try {
+				conn = ds.getConnection();
+			} catch (SQLException e) {
+				throw new ServerErrorException("Could not connect to the database",
+						Response.Status.SERVICE_UNAVAILABLE);
+			}
+			System.out.println("Conectados a la base de datos");
+			PreparedStatement stmt = null;
+			
+			try {
+				
+				
+				
+				
+				stmt = conn.prepareStatement( INSERT_AUTHOR); 
+				
+				
+				
+				stmt.setString(1, author.getName());
+				System.out.println(author.getName());
+				System.out.println(stmt);
+				stmt.executeUpdate();
+				System.out.println("AUTOR CREADO");
+				
+				
+				
+				stmt.executeUpdate();// Ejecuto la actualización
+				ResultSet rs = stmt.getGeneratedKeys();// query para saber si ha ido
+				
+				
+				if (rs.next()) {
+					int bookid = rs.getInt(1);
+				} else {
+					throw new BadRequestException("Can't view the Review");
+				}
+			} catch (SQLException e) {
+				throw new ServerErrorException(e.getMessage(),
+						Response.Status.INTERNAL_SERVER_ERROR);
+			} finally {
+				try {
+					if (stmt != null)
+						stmt.close();
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+		 
+			return author;
+		}
+		
+//Metodo para actualizar una ficha Autor
+@PUT
+@Path("author/{authorid}")
+@Consumes(MediaType.BOOKS_API_BOOKS)
+@Produces(MediaType.BOOKS_API_BOOKS)
+public Authors updateAuthor(@PathParam("authorid") int authorid, Authors author) {
+
+	if (!security.isUserInRole("admin"))
+		throw new ForbiddenException("You are not allowed to delete a book");
+	System.out.println("Eres admin");
+
+	//setAdministrator(security.isUserInRole("admin"));
+
+	//ValidateBookforUpdate(book);
+	System.out.println("Book validado");
+	Connection conn = null;
+	try {
+		conn = ds.getConnection();
+	} catch (SQLException e) {
+		throw new ServerErrorException("Could not connect to the database",
+				Response.Status.SERVICE_UNAVAILABLE);
+	}
+	System.out.println("BD establecida");
+	PreparedStatement stmt = null;
+
+	try {
+		
+		
+		stmt = conn.prepareStatement(UPDATE_AUTHOR_QUERY);
+		
+		stmt.setString(1, author.getName());
+		stmt.setInt(2, authorid);
+		
+		
+		int rows = stmt.executeUpdate();
+		
+		String sauthorid = Integer.toString(authorid);
+		System.out.println("Miramos si hay contestación row=" + sauthorid);
+		if (rows == 1) {
+			
+			//author = getBookFromDatabase(sauthorid);
+			System.out.println("Ha ido bieeen");
+			
+		} else {
+			throw new NotFoundException("There's no author with authorid="
+					+ authorid);// Updating inexistent sting
+		}
+
+	} catch (SQLException e) {
+		throw new ServerErrorException(e.getMessage(),
+				Response.Status.INTERNAL_SERVER_ERROR);
+	} finally {
+		try {
+			if (stmt != null)
+				stmt.close();
+			conn.close();
+		} catch (SQLException e) {
+		}
+	}
+
+	return author;
+}
+
+
+
+
+
+
+
+//Metodo para borrar una ficha de autor
+@DELETE
+@Path("author/{authorid}")
+public void deleteAuthor(@PathParam("authorid") String authorid) {
+
+	if (!security.isUserInRole("admin"))
+		throw new ForbiddenException("You are not allowed to delete a book");
+
+	Connection conn = null;
+	try {
+		conn = ds.getConnection();
+	} catch (SQLException e) {
+		throw new ServerErrorException("Could not connect to the database",
+				Response.Status.SERVICE_UNAVAILABLE);
+	}
+
+	PreparedStatement stmt = null;
+
+	try {
+		
+		stmt = conn.prepareStatement(DELETE_AUTHOR_QUERY);
+		stmt.setInt(1, Integer.valueOf(authorid));
+
+		int rows = stmt.executeUpdate();
+
+		if (rows == 0)
+			throw new NotFoundException("There's no author with authorid="
+					+authorid);
+
+	} catch (SQLException e) {
+		throw new ServerErrorException(e.getMessage(),
+				Response.Status.INTERNAL_SERVER_ERROR);
+	} finally {
+		try {
+			if (stmt != null)
+				stmt.close();
+			conn.close();
+		} catch (SQLException e) {
+		}
+	}
+
+}
+
 	
 	
 

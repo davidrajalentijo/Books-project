@@ -15,9 +15,23 @@ public class Books {
 	String author= null;
 	String language=null;
 	String edition=null;
-	Date editiondate=null;
-	Date printdate=null;
+	//Date editiondate=null;
+	//Date printdate=null;
 	String editorial=null;
+	private Date editiondate;
+	public Date getEditiondate() {
+		return editiondate;
+	}
+	public void setEditiondate(Date editiondate) {
+		this.editiondate = editiondate;
+	}
+	public Date getPrintdate() {
+		return printdate;
+	}
+	public void setPrintdate(Date printdate) {
+		this.printdate = printdate;
+	}
+	private Date printdate;
 	List<Reviews> reviews= new ArrayList<Reviews>();
 	
 	
@@ -51,20 +65,20 @@ public class Books {
 	public void setEdition(String edition) {
 		this.edition = edition;
 	}
-	public Date getEditiondate() {
-		return editiondate;
-	}
-	public void setEditiondate(Date editiondate) {
-		this.editiondate = editiondate;
-	}
-	public Date getPrintdate() {
-		return printdate;
-	}
-	public void setPrintdate(Date printdate) {
-		this.printdate = printdate;
-	}
+	//public Date getEditiondate() {
+		//return editiondate;
+	//}
+	//public void setEditiondate(Date editiondate) {
+		//this.editiondate = editiondate;
+	//}
+	//public Date getPrintdate() {
+		//return printdate;
+	//}
+	//public void setPrintdate(Date printdate) {
+		//this.printdate = printdate;
+	//}
 	public String getEditorial() {
-		return editorial;
+	return editorial;
 	}
 	public void setEditorial(String editorial) {
 		this.editorial = editorial;

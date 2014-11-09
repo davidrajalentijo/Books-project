@@ -10,9 +10,9 @@ create table users (
 );
 
 
-create table author (
-	username	varchar(20) not null 
-
+create table authors (
+authorid		int  auto_increment primary key,
+	name	varchar(20) not null 
 );
 
 
