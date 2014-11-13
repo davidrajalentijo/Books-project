@@ -2,12 +2,23 @@ package edu.upc.eetac.dsa.draja.books.server.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.glassfish.jersey.linking.InjectLinks;
+import org.glassfish.jersey.linking.Binding;
+import org.glassfish.jersey.linking.InjectLink;
+
+import org.glassfish.jersey.linking.InjectLink.Style;
 
 import javax.ws.rs.core.Link;
 import edu.upc.eetac.dsa.draja.books.server.MediaType;
 import edu.upc.eetac.dsa.draja.books.server.BooksResource;
 
 public class BooksCollection {
+	@InjectLinks({
+		@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, rel = "self", title = "books", type = MediaType.BOOKS_API_BOOKS_COLLECTION),
+		//@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, condition="${resource.administrador}", rel = "create-book", title = "Create book", type = MediaType.BOOKS_API_BOOKS, method="createBook"),
+		@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, rel = "book", title = "book", type = MediaType.BOOKS_API_BOOKS)
+		})
+	
 private List<Link> links;
 	
 	private List<Books> books;

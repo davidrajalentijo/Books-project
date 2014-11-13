@@ -3,12 +3,27 @@ package edu.upc.eetac.dsa.draja.books.server.model;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+
 import javax.ws.rs.core.Link;
+
+import org.glassfish.jersey.linking.InjectLinks;
+import org.glassfish.jersey.linking.Binding;
+import org.glassfish.jersey.linking.InjectLink;
+
+import org.glassfish.jersey.linking.InjectLink.Style;
 
 import edu.upc.eetac.dsa.draja.books.server.MediaType;
 import edu.upc.eetac.dsa.draja.books.server.BooksResource;
 
 public class Books {
+	@InjectLinks({
+		@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, rel = "self edit", title = "Book", type = MediaType.BOOKS_API_BOOKS, method = "getBook", bindings = @Binding(name = "bookid", value = "${instance.id}")), 
+		@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, rel = "create-book", title = "Create Book", type = MediaType.BOOKS_API_BOOKS, method = "createBook"), 
+		@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, rel = "search author", title = "Search", type = MediaType.BOOKS_API_BOOKS, method = "getBookbytitleAuthor", bindings ={ @Binding(name = "author", value = "${instance.author}"),@Binding(name = "title", value = "${instance.title}")}) 
+	})
+	
+	
+	
 	private List<Link> links;
 	int id=0;
 	String title=null;
@@ -19,6 +34,20 @@ public class Books {
 	//Date printdate=null;
 	String editorial=null;
 	private Date editiondate;
+	private List<Authors> authors = new ArrayList<Authors>();
+	
+	
+	public List<Authors> getAuthors() {
+		return authors;
+	}
+	public void setAuthors(List<Authors> authors) {
+		this.authors = authors;
+	}
+
+	
+	
+	
+	
 	public Date getEditiondate() {
 		return editiondate;
 	}

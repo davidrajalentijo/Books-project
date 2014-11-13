@@ -6,4 +6,4 @@ In this directory run mvn package
 
 Installation
 
-Deploy the war file ./target/books-api.war in your Tomcat instance.
+Deploy the war file ./target/books-server.war in your Tomcat instance.

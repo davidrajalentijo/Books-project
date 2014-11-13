@@ -5,8 +5,20 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import javax.ws.rs.core.Link;
+import org.glassfish.jersey.linking.Binding;
+import org.glassfish.jersey.linking.InjectLink;
+import org.glassfish.jersey.linking.InjectLinks;
+import org.glassfish.jersey.linking.InjectLink.Style;
 
 public class Reviews {
+	@InjectLinks({
+		@InjectLink(resource = BooksResource.class, rel = "create-review", title = "Book", type = MediaType.BOOKS_API_BOOKS, method = "createReview"),
+		@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, rel = "create-review", title = "Book", type = MediaType.BOOKS_API_BOOKS, method = "createReview"),
+		@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, rel = "update-review", title = "updateBook", type = MediaType.BOOKS_API_BOOKS, method = "updateReview", bindings ={ @Binding(name = "reviewid", value = "${instance.reviewid}"),@Binding(name = "bookid", value = "${instance.bookid}")}),
+		@InjectLink(resource = BooksResource.class, style = Style.ABSOLUTE, rel = "delete-review", title = "deleteBook", type = MediaType.BOOKS_API_BOOKS, method = "deleteReview", bindings ={ @Binding(name = "reviewid", value = "${instance.reviewid}"),@Binding(name = "bookid", value = "${instance.bookid}")})
+
+	})
+	
 	private List<Link> links;
 	
 	int reviewid= 0;

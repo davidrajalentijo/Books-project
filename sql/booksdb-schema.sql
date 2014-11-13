@@ -11,7 +11,7 @@ create table users (
 
 
 create table authors (
-authorid		int  auto_increment primary key,
+authorid		int not null auto_increment primary key,
 	name	varchar(20) not null 
 );
 
@@ -26,7 +26,7 @@ create table user_roles (
 create table books(
 	bookid		int  auto_increment primary key,
 	title		varchar(80) not null,
-	author		varchar(20) not null,
+	author      varchar(80) not null,
 	language	varchar(15) not null,
 	edition		varchar(20) not null,
 	editiondate	date,
@@ -34,14 +34,21 @@ create table books(
 	editorial	varchar(20) not null
 
 );
+create table books_authors (
+	bookid int not null,
+	authorid int not null,
+	foreign key(authorid) references authors(authorid),
+	foreign key(bookid) references books(bookid),
+	primary key (bookid, authorid)
+);
 
 create table reviews(
-reviewid	integer unique auto_increment not null,
+reviewid	int not null auto_increment unique,
 	username	varchar(20) not null,
 	dateupdate	date ,
 	text		varchar(500),
 	bookid		int not null,
 	foreign key (username) references users(username),
-	foreign key (bookid) references books(bookid) on delete cascade,
+	foreign key (bookid) references books(bookid),
 	primary key (bookid,username)
 );

@@ -9,6 +9,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.util.Calendar;
+import java.util.List;
 
 import javax.sql.DataSource;
 import javax.ws.rs.BadRequestException;
@@ -59,14 +61,17 @@ public class BooksResource {
 	private String UPDATE_REVIEW_QUERY ="update reviews set  text=ifnull(?, text) where bookid=? and reviewid=?;";
 	private String GET_REVIEW_BY_REVIEWID_QUERY = "select * from reviews where bookid=? and reviewid=?;";
 	private String DELETE_REVIEW_QUERY="delete from reviews where reviewid=? and bookid=?;";
-	private String INSERT_BOOK ="insert into books (title,author,language,edition,editorial,printdate,editiondate) values(?,?,?,?,?,?,?);";
-	private String UPDATE_BOOKS_QUERY = "update books set title=ifnull(?, title), author=ifnull(?, author), language=ifnull(?, language), edition=ifnull(?, edition), editiondate=ifnull(?, editiondate), printdate=ifnull(?, printdate), editorial=ifnull(?, editorial) where bookid=?;";
+	private String INSERT_BOOK ="insert into books (title,language,author,edition,editorial,printdate,editiondate) values(?,?,?,?,?,?,?);";
+	private String UPDATE_BOOKS_QUERY = "update books set title=ifnull(?, title), language=ifnull(?, language), edition=ifnull(?, edition), editiondate=ifnull(?, editiondate), printdate=ifnull(?, printdate), editorial=ifnull(?, editorial) where bookid=?;";
     private String DELETE_BOOKS_QUERY ="delete from books where bookid=?;";
     private String GET_BOOKS_COLLECTION_QUERY = "select * from books";
     private String INSERT_AUTHOR ="insert into authors (name) values (?);";
     private String DELETE_AUTHOR_QUERY = "delete from authors where authorid=?;";
     private String UPDATE_AUTHOR_QUERY = "update authors set name=ifnull(?, name) where authorid=?;";
-    
+    private String SEARCH_AUTHOR_QUERY = "select * from authors where name=?;";
+    private String INSERT_BOOK_AUTHOR = "insert into books_authors (bookid, authorid) values (?,?);";
+    private String GET_AUTHOR_BY_NAME ="select * from authors where name = ?;";
+    private String GET_REVIEW_BY_USER = "select * from reviews where username = ? and bookid = ?";
 	//Metodo que devuelve la ficha de un libro en concreto, además es cacheable
 	@GET
 	@Path("/{bookid}")
@@ -132,7 +137,7 @@ public class BooksResource {
 				book.setEditorial(rs.getString("editorial"));
 
 			}else{
-				throw new NotFoundException("There's no sting with stingid ="
+				throw new NotFoundException("There's no book with bookid ="
 						+ bookid);
 			}
 
@@ -213,7 +218,7 @@ public class BooksResource {
 			Books book = new Books();
 			book.setId(rs.getInt("bookid"));
 			book.setTitle(rs.getString("title"));
-			book.setAuthor(rs.getString("author"));
+			//book.setAuthor(rs.getString("author"));
 			book.setLanguage(rs.getString("language"));
 			book.setEdition(rs.getString("edition"));
 			book.setEditiondate(rs.getDate("editiondate"));
@@ -276,7 +281,7 @@ public class BooksResource {
 	@Produces(MediaType.BOOKS_API_REVIEW)
 	public Reviews createReseña(@PathParam("bookid") String bookid, Reviews review) {
 		validateReseña(review);
-		
+		validatenocreate(review);
 		if (!security.isUserInRole("registered"))
 			throw new ForbiddenException(
 					"You are not allowed to create reviews for a book");
@@ -302,17 +307,8 @@ public class BooksResource {
 			//Para que un usuario solo haga una reseña de un libro
 			
 			
-			stmt = conn.prepareStatement( GET_REVIEW); 
-			stmt.setInt(1, Integer.valueOf(bookid));
-			stmt.setString(2, security.getUserPrincipal().getName()); //devuelve el id del usuario autenticado
-			System.out.println("Mirar reseña" + stmt);
-			ResultSet rsV = stmt.executeQuery();
-			if (rsV != null){
-				stmt.close();
-				throw new BadRequestException("Can't create other Review of the same Book "
-						+ tmp);
-			}
-			stmt = conn.prepareStatement( INSERT_REVIEW_QUERY); 
+		
+			stmt = conn.prepareStatement( INSERT_REVIEW_QUERY, Statement.RETURN_GENERATED_KEYS); 
 			stmt.setString(1, tmp);
 			stmt.setString(2, review.getText());
 			stmt.setInt(3, Integer.parseInt(bookid));
@@ -353,6 +349,43 @@ public class BooksResource {
 	}
 	
 	
+	
+	// Método para comprobar que el usuario no ha escrito ya una review
+		private void validatenocreate(Reviews review) {
+			Connection conn = null;
+			try {
+				conn = ds.getConnection();
+			} catch (SQLException e) {
+				throw new ServerErrorException("Could not connect to the database",
+						Response.Status.SERVICE_UNAVAILABLE);
+			}
+
+			PreparedStatement stmt = null;
+			try {
+				stmt = conn.prepareStatement(GET_REVIEW_BY_USER);
+				stmt.setString(1, review.getUsername());
+				
+				stmt.setInt(2, review.getBookid());
+				System.out.println(stmt);
+				ResultSet rs = stmt.executeQuery();
+				if (rs.next())
+					throw new BadRequestException("Ya has publicado una review para este libro");
+			} catch (SQLException e) {
+				throw new ServerErrorException(e.getMessage(),
+						Response.Status.INTERNAL_SERVER_ERROR);
+			} finally {
+				try {
+					if (stmt != null)
+						stmt.close();
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+		}
+	
+	
+	
+	
 	private void validateReseña(Reviews review) {
 		
 		
@@ -374,7 +407,7 @@ public class BooksResource {
 	@Consumes(MediaType.BOOKS_API_REVIEW) 
 	@Produces(MediaType.BOOKS_API_REVIEW)
 	public Reviews updateReseña(@PathParam("bookid") String bookid, @PathParam("reviewid") String reviewid, Reviews review) {
-		
+		validateReseña(review);
 		
 		if (!security.isUserInRole("registered"))
 			throw new ForbiddenException(
@@ -488,10 +521,13 @@ return review;
 	@Path("/{bookid}/reviews/{reviewid}")
 	public void deleteReview(@PathParam("bookid") String bookid, @PathParam("reviewid") String reviewid) {
 		//tenemos un void de manera que no devuelve nada ni consume ni produce, devuelve 204 ya que no hay contenido
-	
+		if (!security.isUserInRole("registered"))
+			throw new ForbiddenException(
+					"You are not allowed to create reviews for a book");
+		String tmp = security.getUserPrincipal().getName();
 
 		setRegistered(security.isUserInRole("registered"));
-		setRegistered(security.isUserInRole("admin"));
+		//setRegistered(security.isUserInRole("admin"));
 		System.out.println("Entramos");
 		System.out.println("Reviewid " +reviewid +"Bookid " + bookid);
 		Connection conn = null;
@@ -536,7 +572,7 @@ return review;
 		@Produces(MediaType.BOOKS_API_BOOKS)
 		public Books createBook(Books book) {
 			//validateReseña(review);
-			
+			validateBook(book);
 			if (!security.isUserInRole("admin"))
 				throw new ForbiddenException("You are not allowed to create a book");
 			
@@ -551,36 +587,87 @@ return review;
 			}
 			System.out.println("Conectados a la base de datos");
 			PreparedStatement stmt = null;
+			//PreparedStatement stmt2 = null;
 			
 			try {
-				
-				//Para que un usuario solo haga una reseña de un libro
-				
-				
-				stmt = conn.prepareStatement( INSERT_BOOK); 
-				
-				
+			
+				//Para mirar si el autor ya existe
+				stmt = conn.prepareStatement( INSERT_BOOK,Statement.RETURN_GENERATED_KEYS);
 				stmt.setString(1, book.getTitle());
-				stmt.setString(2, book.getAuthor());
-				stmt.setString(3, book.getLanguage());
+				stmt.setString(3, book.getAuthor());
+				stmt.setString(2, book.getLanguage());
 				stmt.setString(4, book.getEdition());
 				stmt.setString(5, book.getEditorial());
-				stmt.setDate(6, (Date) book.getPrintdate());
-				stmt.setDate(7, (Date) book.getEditiondate());
+				stmt.setDate(6, new Date(Calendar.getInstance().getTime().getTime()));
+				stmt.setDate(7, new Date(Calendar.getInstance().getTime().getTime()));
 				System.out.println(stmt);
 				stmt.executeUpdate();
 				System.out.println("BOOK CREADO");
-				
-				
-				
-				//stmt.executeUpdate();// Ejecuto la actualización
-				ResultSet rs = stmt.getGeneratedKeys();// query para saber si ha ido
-				
+				ResultSet rs = stmt.getGeneratedKeys();
+
+
 				
 				if (rs.next()) {
 					int bookid = rs.getInt(1);
+					
+					book = getBookFromDatabase(Integer.toString(bookid));
+				
+
+					
+					
+				} 
+			} catch (SQLException e) {
+				
+			
+				throw new ServerErrorException(e.getMessage(),
+						Response.Status.INTERNAL_SERVER_ERROR);
+		} 
+
+			
+			finally {
+				try {
+					if (stmt != null)
+						stmt.close();
+					
+					conn.close();
+				} catch (SQLException e) {
+				}
+			}
+		 
+			return book;
+		}
+	
+		
+		
+		
+		private void validateBook(Books book) {
+		
+
+			int aut = getAuthorFromDatabase(book.getAuthor());
+			if (aut == 0)
+				throw new BadRequestException("No se puede crear el libro ya que el autor no existe en la base de datos");
+		}
+		
+
+		// Método para ver si el autor ya tiene ficha
+		private int getAuthorFromDatabase(String name) {
+			Connection conn = null;
+			try {
+				conn = ds.getConnection();
+			} catch (SQLException e) {
+				throw new ServerErrorException("Could not connect to the database",
+						Response.Status.SERVICE_UNAVAILABLE);
+			}
+
+			PreparedStatement stmt = null;
+			try {
+				stmt = conn.prepareStatement(GET_AUTHOR_BY_NAME);
+				stmt.setString(1, name);
+				ResultSet rs = stmt.executeQuery();
+				if (rs.next()) {
+					return 1;
 				} else {
-					throw new BadRequestException("Can't view the Review");
+					return 0;
 				}
 			} catch (SQLException e) {
 				throw new ServerErrorException(e.getMessage(),
@@ -593,10 +680,24 @@ return review;
 				} catch (SQLException e) {
 				}
 			}
-		 
-			return book;
 		}
-	
+		
+		
+		private void validateAuthor(String author){
+			
+			
+			
+			
+			if (author == null ){
+				throw new BadRequestException(
+						"No se puede crear la ficha del libro porque no existe ningún autor con este nombre en nuestra base de datos");}
+			
+			
+			
+		}
+		
+		
+		
 		
 	//Metodo par Actualizar la ficha de un libro
 		@PUT
@@ -629,13 +730,13 @@ return review;
 				stmt = conn.prepareStatement(UPDATE_BOOKS_QUERY);
 				
 				stmt.setString(1, book.getTitle());
-				stmt.setString(2, book.getAuthor());
-				stmt.setString(3, book.getLanguage());
-				stmt.setString(4, book.getEdition());
-				stmt.setDate(5, (Date) book.getEditiondate());
-				stmt.setDate(6, (Date) book.getPrintdate());
-				stmt.setString(7, book.getEditorial());
-				stmt.setInt(8, bookid);
+				//stmt.setString(2, book.getAuthor());
+				stmt.setString(2, book.getLanguage());
+				stmt.setString(3, book.getEdition());
+				stmt.setDate(4, new Date(Calendar.getInstance().getTime().getTime()));
+				stmt.setDate(5, new Date(Calendar.getInstance().getTime().getTime()));
+				stmt.setString(6, book.getEditorial());
+				stmt.setInt(7, bookid);
 				
 				int rows = stmt.executeUpdate();
 				
@@ -734,13 +835,14 @@ return review;
 				stmt = conn.prepareStatement(GET_BOOKS_COLLECTION_QUERY);
 				
 				ResultSet rs = stmt.executeQuery();
+				System.out.println(rs.getFetchSize());
 				while (rs.next()) {
 					
 					Books book = new Books();
 
 					book.setId(rs.getInt("bookid"));
 					book.setTitle(rs.getString("title"));
-					book.setAuthor(rs.getString("author"));
+					//book.setAuthor(rs.getString("author"));
 					book.setLanguage(rs.getString("language"));
 					book.setEdition(rs.getString("edition"));
 					book.setEditiondate(rs.getDate("editiondate"));
@@ -814,7 +916,7 @@ return review;
 				
 				
 				
-				stmt = conn.prepareStatement( INSERT_AUTHOR); 
+				stmt = conn.prepareStatement( INSERT_AUTHOR,  Statement.RETURN_GENERATED_KEYS); 
 				
 				
 				
@@ -878,7 +980,7 @@ public Authors updateAuthor(@PathParam("authorid") int authorid, Authors author)
 	try {
 		
 		
-		stmt = conn.prepareStatement(UPDATE_AUTHOR_QUERY);
+		stmt = conn.prepareStatement(UPDATE_AUTHOR_QUERY,  Statement.RETURN_GENERATED_KEYS);
 		
 		stmt.setString(1, author.getName());
 		stmt.setInt(2, authorid);
