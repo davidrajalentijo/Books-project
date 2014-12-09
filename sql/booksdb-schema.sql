@@ -31,7 +31,8 @@ create table books(
 	edition		varchar(20) not null,
 	editiondate	date,
 	printdate	date,
-	editorial	varchar(20) not null
+	editorial	varchar(20) not null,
+	  Last_modified timestamp
 
 );
 create table books_authors (
@@ -48,6 +49,7 @@ reviewid	int not null auto_increment unique,
 	dateupdate	date ,
 	text		varchar(500),
 	bookid		int not null,
+	  Last_modified timestamp,
 	foreign key (username) references users(username),
 	foreign key (bookid) references books(bookid),
 	primary key (bookid,username)

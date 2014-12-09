@@ -812,7 +812,8 @@ return review;
 		//METODO QUE DEVUELVE TODA LA COLECCIÓN DE LIBROS
 		@GET
 		@Produces(MediaType.BOOKS_API_BOOKS_COLLECTION)
-		public BooksCollection getBooks() {
+		public BooksCollection getBooks(@QueryParam("length") int length,
+				@QueryParam("before") long before, @QueryParam("after") long after) {
 
 			
 			
@@ -826,51 +827,42 @@ return review;
 				throw new ServerErrorException("Could not connect to the database",
 						Response.Status.SERVICE_UNAVAILABLE);
 			}
-
 			PreparedStatement stmt = null;
-			
-
 			try {
-				
-				stmt = conn.prepareStatement(GET_BOOKS_COLLECTION_QUERY);
-				
-				ResultSet rs = stmt.executeQuery();
-				System.out.println(rs.getFetchSize());
-				while (rs.next()) {
-					
-					Books book = new Books();
-
-					book.setId(rs.getInt("bookid"));
-					book.setTitle(rs.getString("title"));
-					//book.setAuthor(rs.getString("author"));
-					book.setLanguage(rs.getString("language"));
-					book.setEdition(rs.getString("edition"));
-					book.setEditiondate(rs.getDate("editiondate"));
-					book.setPrintdate(rs.getDate("printdate"));
-					book.setEditorial(rs.getString("editorial"));
-
-					// Nos encargamos de las reviews de cada libro
-					PreparedStatement stmtr = null;
-					stmtr = conn.prepareStatement(GET_REVIEW_BY_ID_BOOK_QUERY);
-					stmtr.setInt(1, book.getId());
-
-					ResultSet rsr = stmtr.executeQuery();
-
-					while (rsr.next()) {
-						System.out.println("Review cogida");
-						Reviews review = new Reviews();
-						review.setReviewid(rsr.getInt("reviewid"));
-						review.setDateupdate(rsr.getDate("dateupdate"));
-						review.setText(rsr.getString("text"));
-						review.setUsername(rsr.getString("username"));
-						review.setBookid(rsr.getInt("bookid"));
-
-						book.addReviews(review);
-
-					}
-
-					books.addBook(book);
+				boolean updateFromLast = after > 0;
+				stmt = conn.prepareStatement(buildGetLibrosQuery(updateFromLast));
+				if (updateFromLast) {
+					stmt.setTimestamp(1, new Timestamp(after));
+				} else {
+					if (before > 0)
+						stmt.setTimestamp(1, new Timestamp(before));
+					else
+						stmt.setTimestamp(1, null);
+					length = (length <= 0) ? 20 : length;
+					stmt.setInt(2, length);
 				}
+				ResultSet rs = stmt.executeQuery();
+				boolean first = true;
+				long oldestTimestamp = 0;
+				while (rs.next()) {
+					Books libro = new Books();
+					libro.setId(rs.getInt("bookid"));
+					libro.setTitle(rs.getString("title"));
+					libro.setAuthor(rs.getString("author"));
+					libro.setLanguage(rs.getString("language"));
+					libro.setEdition(rs.getString("edition"));
+					libro.setEditiondate(rs.getDate(6));
+					libro.setPrintdate(rs.getDate(7));
+					libro.setEditorial(rs.getString("editorial"));
+					oldestTimestamp = rs.getTimestamp("last_modified").getTime();
+					libro.setLastModified(oldestTimestamp);
+					if (first) {
+						first = false;
+						books.setNewestTimestamp(libro.getLastModified());
+					}
+					books.addBook(libro);
+				}
+				books.setOldestTimestamp(oldestTimestamp);
 
 			} catch (SQLException e) {
 				throw new ServerErrorException(e.getMessage(),
@@ -887,6 +879,13 @@ return review;
 			return books;
 		}
 
+
+		private String buildGetLibrosQuery(boolean updateFromLast) {
+			if (updateFromLast)
+				return "SELECT * FROM books WHERE last_modified > ? ORDER BY last_modified DESC";
+			else
+				return "SELECT * FROM books WHERE last_modified < ifnull(?, now()) ORDER BY last_modified DESC LIMIT ?";
+		}
 		
 		//Metodo para crear una ficha de autor
 @POST 
@@ -923,7 +922,7 @@ return review;
 				stmt.setString(1, author.getName());
 				System.out.println(author.getName());
 				System.out.println(stmt);
-				stmt.executeUpdate();
+				
 				System.out.println("AUTOR CREADO");
 				
 				

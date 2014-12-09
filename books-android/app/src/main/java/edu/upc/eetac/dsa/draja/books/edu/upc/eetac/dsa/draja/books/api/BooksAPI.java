@@ -191,5 +191,62 @@ public class BooksAPI {
 
 
 
+    private Map<String, Books> booksCache = new HashMap<String, Books>();
+
+    public Books getBook(String urlBook) throws AppException {
+        Books book = null;
+        HttpURLConnection urlConnection = null;
+        try {
+            URL url = new URL(urlBook);
+            urlConnection = (HttpURLConnection) url.openConnection();
+            urlConnection.setRequestMethod("GET");
+            urlConnection.setDoInput(true);
+
+            book = booksCache.get(urlBook);
+            String eTag = (book == null) ? null : book.geteTag();
+            if (eTag != null)
+                urlConnection.setRequestProperty("If-None-Match", eTag);
+            urlConnection.connect();
+            if (urlConnection.getResponseCode() == HttpURLConnection.HTTP_NOT_MODIFIED) {
+                Log.d(TAG, "CACHE");
+                return booksCache.get(urlBook);
+            }
+            Log.d(TAG, "NOT IN CACHE");
+            book = new Books();
+            eTag = urlConnection.getHeaderField("ETag");
+            book.seteTag(eTag);
+            booksCache.put(urlBook, book);
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    urlConnection.getInputStream()));
+            StringBuilder sb = new StringBuilder();
+            String line = null;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            JSONObject jsonSting = new JSONObject(sb.toString());
+            book.setTitle(jsonSting.getString("title"));
+            book.setAuthor(jsonSting.getString("author"));
+            book.setEditioral(jsonSting.getString("editorial"));
+            book.setBookid(jsonSting.getInt("id"));
+            book.setLanguage(jsonSting.getString("language"));
+            book.setEdition(jsonSting.getString("edition"));
+
+            JSONArray jsonLinks = jsonSting.getJSONArray("links");
+            parseLinks(jsonLinks, book.getLinks());
+        } catch (MalformedURLException e) {
+            Log.e(TAG, e.getMessage(), e);
+            throw new AppException("Bad sting url");
+        } catch (IOException e) {
+            Log.e(TAG, e.getMessage(), e);
+            throw new AppException("Exception when getting the book");
+        } catch (JSONException e) {
+            Log.e(TAG, e.getMessage(), e);
+            throw new AppException("Exception parsing response");
+        }
+
+        return book;
+    }
+
 
 }

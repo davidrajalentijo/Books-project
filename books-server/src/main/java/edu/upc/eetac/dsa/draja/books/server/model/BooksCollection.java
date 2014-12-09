@@ -24,7 +24,24 @@ private List<Link> links;
 	private List<Books> books;
 	private int beforebook;
 	private int afterbook;
-	
+	private long newestTimestamp;
+	public long getNewestTimestamp() {
+		return newestTimestamp;
+	}
+
+	public void setNewestTimestamp(long newestTimestamp) {
+		this.newestTimestamp = newestTimestamp;
+	}
+
+	public long getOldestTimestamp() {
+		return oldestTimestamp;
+	}
+
+	public void setOldestTimestamp(long oldestTimestamp) {
+		this.oldestTimestamp = oldestTimestamp;
+	}
+
+	private long oldestTimestamp;
 	
 	
 	public BooksCollection() {

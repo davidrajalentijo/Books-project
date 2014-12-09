@@ -19,6 +19,7 @@ import android.widget.ListView;
 import java.net.Authenticator;
 import java.net.PasswordAuthentication;
 import java.util.ArrayList;
+import com.google.gson.Gson;
 
 import edu.upc.eetac.dsa.draja.books.edu.upc.eetac.dsa.draja.books.api.AppException;
 import edu.upc.eetac.dsa.draja.books.edu.upc.eetac.dsa.draja.books.api.BookAdapter;
@@ -95,4 +96,45 @@ public class BooksMainActivity extends ListActivity {
         booksList.addAll(books.getBooks());
         adapter.notifyDataSetChanged();
     }
+
+    @Override
+    protected void onListItemClick(ListView l, View v, int position, long id) {
+        Books sting = booksList.get(position);
+        Log.d(TAG, sting.getLinks().get("self").getTarget());
+
+        Intent intent = new Intent(this, BookDetailActivity.class);
+        intent.putExtra("url", sting.getLinks().get("self").getTarget());
+        startActivity(intent);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.miWrite:
+                Intent intent = new Intent(this, WriteBookActivity.class);
+                startActivityForResult(intent, WRITE_ACTIVITY);
+                return true;
+
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+    }
+
+    private final static int WRITE_ACTIVITY = 0;
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode) {
+            case WRITE_ACTIVITY:
+                if (resultCode == RESULT_OK) {
+                    Bundle res = data.getExtras();
+                    String jsonSting = res.getString("json-sting");
+                    Books sting = new Gson().fromJson(jsonSting, Books.class);
+                    booksList.add(0, sting);
+                    adapter.notifyDataSetChanged();
+                }
+                break;
+        }
+    }
+
 }

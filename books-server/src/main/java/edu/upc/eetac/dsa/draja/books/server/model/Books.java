@@ -34,6 +34,13 @@ public class Books {
 	//Date printdate=null;
 	String editorial=null;
 	private Date editiondate;
+	private long lastModified;
+	public long getLastModified() {
+		return lastModified;
+	}
+	public void setLastModified(long lastModified) {
+		this.lastModified = lastModified;
+	}
 	private List<Authors> authors = new ArrayList<Authors>();
 	
 	
