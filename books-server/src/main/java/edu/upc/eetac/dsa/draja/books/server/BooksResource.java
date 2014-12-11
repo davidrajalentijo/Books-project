@@ -218,7 +218,7 @@ public class BooksResource {
 			Books book = new Books();
 			book.setId(rs.getInt("bookid"));
 			book.setTitle(rs.getString("title"));
-			//book.setAuthor(rs.getString("author"));
+			book.setAuthor(rs.getString("author"));
 			book.setLanguage(rs.getString("language"));
 			book.setEdition(rs.getString("edition"));
 			book.setEditiondate(rs.getDate("editiondate"));

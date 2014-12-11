@@ -248,5 +248,65 @@ public class BooksAPI {
         return book;
     }
 
+    public BooksCollection getBooksByTitle(String title) throws AppException {
+        Log.d(TAG, "getBooksByTitle()");
+        BooksCollection books = new BooksCollection();
+
+        HttpURLConnection urlConnection = null;
+        try {
+            urlConnection = (HttpURLConnection) new URL(rootAPI.getLinks()
+                    .get("books").getTarget() + "/search?title=" + title).openConnection();
+            Log.d(TAG, String.valueOf(urlConnection));
+            urlConnection.setRequestMethod("GET");
+            urlConnection.setDoInput(true);
+            urlConnection.connect();
+        } catch (IOException e) {
+            throw new AppException(
+                    "Can't connect to Books API Web Service");
+        }
+
+        BufferedReader reader;
+        try {
+            reader = new BufferedReader(new InputStreamReader(
+                    urlConnection.getInputStream()));
+            StringBuilder sb = new StringBuilder();
+            String line = null;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+
+            JSONObject jsonObject = new JSONObject(sb.toString());
+            JSONArray jsonLinks = jsonObject.getJSONArray("links");
+            parseLinks(jsonLinks, books.getLinks());
+
+
+            books.setNewestTimestamp(jsonObject.getLong("newestTimestamp"));
+            books.setOldestTimestamp(jsonObject.getLong("oldestTimestamp"));
+            JSONArray jsonBooks = jsonObject.getJSONArray("books");
+            for (int i = 0; i < jsonBooks.length(); i++) {
+                Books book = new Books();
+                System.out.println("LLegamos aqui");
+                JSONObject jsonSting = jsonBooks.getJSONObject(i);
+                book.setTitle(jsonSting.getString("title"));
+                book.setAuthor(jsonSting.getString("author"));
+                book.setEditioral(jsonSting.getString("editorial"));
+                book.setBookid(jsonSting.getInt("id"));
+                book.setLanguage(jsonSting.getString("language"));
+
+                Log.d(TAG, book.getTitle());
+
+                jsonLinks = jsonSting.getJSONArray("links");
+                parseLinks(jsonLinks, book.getLinks());
+                books.getBooks().add(book);
+            }
+        } catch (IOException e) {
+            throw new AppException(
+                    "Can't get response from Books API Web Service");
+        } catch (JSONException e) {
+            throw new AppException("Error parsing Books Root API");
+        }
+
+        return books;
+    }
 
 }
